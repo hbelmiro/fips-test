@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+
+	_ "github.com/argoproj/argo-workflows/v3/workflow/common"
 )
 
 func main() {
