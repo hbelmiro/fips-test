@@ -1,0 +1,63 @@
+name: Test FIPS configurations
+
+on: push
+
+jobs:
+  local-dev:
+    name: "Local dev (standard Go, no FIPS)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build without GOFIPS140
+        run: go build -o fips-test .
+      - name: Run binary
+        run: ./fips-test
+
+  docker-fips:
+    name: "${{ matrix.name }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "current image + auto"
+            go_toolset_image: "registry.access.redhat.com/ubi9/go-toolset:1.26.3@sha256:d36470d5258da00f618b7aca9bdaab8e05134aa938bd6c42d9bd17d50ed45e76"
+            gofips140: "v1.0.0"
+            godebug_value: "fips140=auto"
+
+          - name: "original DSP image + auto"
+            go_toolset_image: "registry.access.redhat.com/ubi9/go-toolset:1.26.3-1777889793@sha256:1c1259373e6feb4b57de490452379c40888cf6e876154cd2ace17eae9c64a7ea"
+            gofips140: "v1.0.0"
+            godebug_value: "fips140=auto"
+
+          - name: "latest 1.26.3 + auto"
+            go_toolset_image: "registry.access.redhat.com/ubi9/go-toolset:1.26.3"
+            gofips140: "v1.0.0"
+            godebug_value: "fips140=auto"
+
+          - name: "current image + on (baseline)"
+            go_toolset_image: "registry.access.redhat.com/ubi9/go-toolset:1.26.3@sha256:d36470d5258da00f618b7aca9bdaab8e05134aa938bd6c42d9bd17d50ed45e76"
+            gofips140: "v1.0.0"
+            godebug_value: "fips140=on"
+
+          - name: "current image + no GODEBUG"
+            go_toolset_image: "registry.access.redhat.com/ubi9/go-toolset:1.26.3@sha256:d36470d5258da00f618b7aca9bdaab8e05134aa938bd6c42d9bd17d50ed45e76"
+            gofips140: "v1.0.0"
+            godebug_value: ""
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: |
+          docker build \
+            --build-arg GO_TOOLSET_IMAGE="${{ matrix.go_toolset_image }}" \
+            --build-arg GOFIPS140="${{ matrix.gofips140 }}" \
+            --build-arg GODEBUG_VALUE="${{ matrix.godebug_value }}" \
+            -t fips-test .
+
+      - name: Run image
+        run: docker run --rm fips-test
