@@ -1,0 +1,74 @@
+name: Check Payload FIPS Compliance
+
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "Image to scan (e.g. quay.io/opendatahub/ds-pipelines-driver:pr-360)"
+        required: false
+
+jobs:
+  check-payload:
+    name: "${{ matrix.name }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "fips-test (this repo)"
+            image: ""
+          - name: "ds-pipelines-driver:pr-360"
+            image: "quay.io/opendatahub/ds-pipelines-driver:pr-360"
+          - name: "ds-pipelines-launcher:pr-360"
+            image: "quay.io/opendatahub/ds-pipelines-launcher:pr-360"
+          - name: "ds-pipelines-api-server:pr-360"
+            image: "quay.io/opendatahub/ds-pipelines-api-server:pr-360"
+          - name: "ds-pipelines-persistenceagent:pr-360"
+            image: "quay.io/opendatahub/ds-pipelines-persistenceagent:pr-360"
+          - name: "ds-pipelines-scheduledworkflow:pr-360"
+            image: "quay.io/opendatahub/ds-pipelines-scheduledworkflow:pr-360"
+          - name: "dspo:odh-pr-1062"
+            image: "quay.io/opendatahub/data-science-pipelines-operator:odh-pr-1062"
+          - name: "argo-argoexec:fips-on"
+            image: "quay.io/hbelmiro/ds-pipelines-argo-argoexec:fips-on"
+          - name: "argo-workflowcontroller:fips-on"
+            image: "quay.io/hbelmiro/ds-pipelines-argo-workflowcontroller:fips-on"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build local image
+        if: matrix.image == ''
+        run: |
+          docker build \
+            --build-arg GODEBUG_VALUE=fips140=on \
+            --build-arg GOTOOLCHAIN_VALUE=local \
+            -t fips-test:local .
+
+      - name: Install check-payload
+        run: go install github.com/openshift/check-payload@latest
+
+      - name: Run check-payload
+        run: |
+          IMAGE="${{ matrix.image }}"
+          if [ -z "$IMAGE" ]; then
+            IMAGE="fips-test:local"
+          fi
+          echo "Scanning: $IMAGE"
+          check-payload scan operator --spec "$IMAGE"
+
+  check-custom:
+    name: "Custom image scan"
+    runs-on: ubuntu-latest
+    if: github.event.inputs.image != ''
+    steps:
+      - name: Install check-payload
+        run: go install github.com/openshift/check-payload@latest
+
+      - name: Run check-payload
+        env:
+          SCAN_IMAGE: ${{ github.event.inputs.image }}
+        run: |
+          echo "Scanning: $SCAN_IMAGE"
+          check-payload scan operator --spec "$SCAN_IMAGE"

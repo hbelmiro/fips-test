@@ -1,0 +1,22 @@
+ARG GO_TOOLSET_IMAGE=registry.access.redhat.com/ubi9/go-toolset:1.26.3
+
+FROM --platform=$BUILDPLATFORM ${GO_TOOLSET_IMAGE} AS builder
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+USER root
+WORKDIR /workspace
+COPY go.mod go.sum ./
+RUN GOTOOLCHAIN=local go mod download
+COPY main.go ./
+RUN GOTOOLCHAIN=local CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOFIPS140=v1.0.0 \
+    go build -tags no_openssl -o /bin/fips-test .
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5
+# NO ENV GODEBUG - this is the key change
+
+# Add the wrapper script
+RUN printf '#!/bin/sh\nif [ "$(cat /proc/sys/crypto/fips_enabled 2>/dev/null)" = "1" ]; then\n  export GODEBUG=fips140=on\nfi\nexec "$@"\n' > /bin/fips-wrapper.sh && \
+    chmod +x /bin/fips-wrapper.sh
+
+COPY --from=builder /bin/fips-test /bin/fips-test
+ENTRYPOINT ["/bin/fips-wrapper.sh", "/bin/fips-test"]
