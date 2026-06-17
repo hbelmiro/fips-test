@@ -47,7 +47,9 @@ jobs:
             -t fips-test:local .
 
       - name: Install check-payload
-        run: go install github.com/openshift/check-payload@latest
+        run: |
+          go install github.com/openshift/check-payload@latest
+          echo "$HOME/go/bin" >> $GITHUB_PATH
 
       - name: Run check-payload
         run: |
