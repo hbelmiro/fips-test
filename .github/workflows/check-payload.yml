@@ -46,6 +46,10 @@ jobs:
             --build-arg GOTOOLCHAIN_VALUE=local \
             -t fips-test:local .
 
+      - name: Install oc CLI
+        run: |
+          curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar xz -C /usr/local/bin oc
+
       - name: Install check-payload
         run: |
           go install github.com/openshift/check-payload@latest
