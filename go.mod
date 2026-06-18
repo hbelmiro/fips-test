@@ -2,6 +2,8 @@ module github.com/hbelmiro/fips-test
 
 go 1.26
 
+godebug fips140=on
+
 toolchain go1.26.3
 
 require github.com/argoproj/argo-workflows/v3 v3.7.14
